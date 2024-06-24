@@ -11,6 +11,8 @@ folder.grid <- list.files("./input/EEA_1km", full.names = TRUE)
 full.map <- NULL
 
 
+EEA.biogeo.shp.map <- data.frame(col.id=as.numeric(row.names(EEA.biogeo.shp)), EEAbiogeo.reg=EEA.biogeo.shp$short_name)
+
 cc <- folder.grid[1]
 for(cc in folder.grid){
   folder.files <- list.files(cc, full.names = TRUE)
@@ -25,14 +27,42 @@ for(cc in folder.grid){
 
   temp.agg <- st_read(folder.files, quiet = TRUE)
   temp.agg <- st_transform(temp.agg, terra::crs(EEA.biogeo.shp))
-  temp.agg <- st_centroid(temp.agg)
+
+  EEA.biogeo.shp.tmp <- st_crop(EEA.biogeo.shp,temp.agg)
+  #temp.agg <- st_centroid(temp.agg)
+
+  tmp.overlay.tbl <- as.data.frame(st_intersects(temp.agg,EEA.biogeo.shp.tmp)) %>% left_join(data.frame(row.id=as.numeric(row.names(temp.agg)), CELLCODE=temp.agg$CELLCODE), by="row.id") %>% left_join(EEA.biogeo.shp.map, by="col.id")  %>% dplyr::select(CELLCODE, EEAbiogeo.reg) %>% unique()
 
 
-  tmp.overlay.tbl <- st_intersection(EEA.biogeo.shp, temp.agg)
-  tmp.overlay.tbl <- tmp.overlay.tbl %>% as.data.frame() %>% dplyr::select(CELLCODE, code) %>% unique()
+
+
+
+
+
+
+  non.unique <- tmp.overlay.tbl[duplicated(tmp.overlay.tbl[,1]) | duplicated(tmp.overlay.tbl[,1], fromLast = TRUE), ]
+  non.unique.pix <- non.unique$CELLCODE
+
+  temp.agg.small <- temp.agg %>% filter(CELLCODE%in%non.unique.pix)
+  temp.overlay.small <- as.data.frame(st_intersection(temp.agg.small,EEA.biogeo.shp) %>% mutate(area=st_area(.))) %>% dplyr::select(CELLCODE, short_name, area)
+
+
+  df_unique <- temp.overlay.small %>%
+    group_by(CELLCODE) %>%
+    arrange(desc(area)) %>%
+    slice(1) %>%
+    ungroup() %>% dplyr::select(-area) %>% rename("EEAbiogeo.reg"="short_name")
+
+  yes.unique <- tmp.overlay.tbl[!(duplicated(tmp.overlay.tbl[,1]) | duplicated(tmp.overlay.tbl[,1], fromLast = TRUE)), ]
+
+  tmp.overlay.tbl <- yes.unique %>% bind_rows(df_unique)
+
 
   full.map <- full.map %>% bind_rows(tmp.overlay.tbl)
 
 }
 
+full.map <- full.map %>% mutate(EEAbiogeo.reg=as.factor(EEAbiogeo.reg)) %>% unique()
+full.map <- full.map[!duplicated(full.map$CELLCODE),]
 
+write.csv(full.map, file="./output/EEAref_EEAbiogeo_mapping_v2.csv", row.names = F)

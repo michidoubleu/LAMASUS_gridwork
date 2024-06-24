@@ -50,3 +50,6 @@ rsconnect/
 
 # Folder with storage intensive inputs
 input/
+
+# Folder with storage intensive inputs
+output/

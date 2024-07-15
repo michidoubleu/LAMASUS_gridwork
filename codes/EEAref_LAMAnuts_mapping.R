@@ -12,7 +12,7 @@ full.map <- NULL
 
 LAMA.shp.map <- data.frame(col.id=as.numeric(row.names(LAMA.shp)), NUTS_ID=LAMA.shp$NUTS_ID)
 
-cc <- folder.grid[30]
+cc <- folder.grid[1]
 for(cc in folder.grid){
   folder.files <- list.files(cc, full.names = TRUE)
   folder.files <- folder.files[grep(".shp",folder.files)]
@@ -53,17 +53,22 @@ for(cc in folder.grid){
   yes.unique <- tmp.overlay.tbl[!(duplicated(tmp.overlay.tbl[,1]) | duplicated(tmp.overlay.tbl[,1], fromLast = TRUE)), ]
 
   tmp.overlay.tbl <- yes.unique %>% bind_rows(df_unique)
+
+  unpresent.cellcodes <- setdiff(unique(temp.agg$CELLCODE), tmp.overlay.tbl$CELLCODE)
+  if(length(unpresent.cellcodes)!=0){
+  unpresent.cellcodes <- data.frame(CELLCODE=unpresent.cellcodes, NUTS_ID="NA_000",cover="o")
+  tmp.overlay.tbl <- tmp.overlay.tbl %>% bind_rows(unpresent.cellcodes)
+  }
   full.map <- full.map %>% bind_rows(tmp.overlay.tbl)
 
 }
 
 
 
-full.map <- full.map%>% mutate(NUTS_ID=as.factor(NUTS_ID)) %>% distinct()
-
+full.map <- full.map%>% mutate(NUTS_ID=as.factor(NUTS_ID)) %>% rename("onesqkmID"="CELLCODE") %>% distinct()
 
 
 full.map <- full.map %>% dplyr::select(-cover)
 
 
-write.csv(full.map, file="./output/EEAref_LAMAnuts_mapping_v2.csv", row.names = F)
+write.csv(full.map, file="./output/EEAref_LAMAnuts_mapping_large.csv", row.names = F)
